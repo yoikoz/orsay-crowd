@@ -2,7 +2,9 @@ name: fetch
 
 on:
   schedule:
-    - cron: '0 12 * * *' # 毎日 UTC 12:00 = JST 21:00（GitHub 側の都合で数分〜数十分遅れることがある）
+    # GitHub の定期実行は毎時0分付近が混み合い、遅延・スキップされやすいので半端な分にする
+    - cron: '17 12 * * *' # JST 21:17 本番
+    - cron: '47 14 * * *' # JST 23:47 予備（本番が動かなかった場合の保険。since_id 以降のみ取得するので重複・追加課金なし）
   workflow_dispatch:
     inputs:
       start_time:
