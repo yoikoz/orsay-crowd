@@ -190,11 +190,24 @@ function fillDays(list) {
 }
 
 // 推移グラフの平均系列。色は系列に固定（並び順で塗り替えない）。祝日の金曜は土日祝に入る
+// 描画順＝重なり順。データの少ない金曜を平均線の中で一番上に描く
 const AVG_SERIES = [
-  { name: '平日平均（火〜木）', short: '火〜木', color: 'var(--s1)', f: p => !isWeekend(p) && p.dow !== 5 },
-  { name: '金曜平均', short: '金', color: 'var(--s3)', f: p => !isWeekend(p) && p.dow === 5 },
-  { name: '土日祝平均', short: '土日祝', color: 'var(--s2)', f: isWeekend },
+  { k: 'tt', name: '平日平均（火〜木）', short: '火〜木', color: 'var(--s1)', f: p => !isWeekend(p) && p.dow !== 5 },
+  { k: 'we', name: '土日祝平均', short: '土日祝', color: 'var(--s2)', f: isWeekend },
+  { k: 'fri', name: '金曜平均', short: '金', color: 'var(--s3)', f: p => !isWeekend(p) && p.dow === 5 },
 ];
+let focusKey = null; // 凡例で強調している系列
+
+function applyFocus() {
+  document.querySelectorAll('.bar .key').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.k === focusKey)));
+  document.querySelector('.bar').classList.toggle('focus', !!focusKey);
+  $('curve').parentElement.classList.toggle('focus', !!focusKey);
+  $('curve').querySelectorAll('.s').forEach(g => g.classList.toggle('on', g.dataset.k === focusKey));
+}
+document.querySelectorAll('.bar .key').forEach(b => b.addEventListener('click', () => {
+  focusKey = focusKey === b.dataset.k ? null : b.dataset.k;
+  applyFocus();
+}));
 
 function drawCurve() {
   const svg = $('curve'), W = svg.clientWidth, H = svg.clientHeight;
@@ -236,8 +249,11 @@ function drawCurve() {
   const path = (a, c) => segments(a).filter(s => s.length > 1).map(s => line(s, c)).join('');
   const dots = (a, c, r) => a.map(d => `<circle cx="${X(d.x)}" cy="${Y(d.v)}" r="${r}" fill="${c}" stroke="var(--bg)" stroke-width="2"/>`).join('');
   // 平均の線には点を打たない（前後とつながらない孤立した点だけ点で示す）。選んだ日は実測なので全点に打つ
-  for (const a of avgs) g += path(a.pts, a.color) + dots(segments(a.pts).filter(s => s.length === 1).flat(), a.color, 4);
-  g += path(sel, 'var(--ink)') + dots(sel, 'var(--ink)', 4);
+  // 各線の下に背景色の縁取り（halo）を敷き、重なっても線同士を見分けられるようにする
+  const halo = a => segments(a).filter(s => s.length > 1).map(s => line(s, 'var(--bg)').replace('stroke-width="2"', 'stroke-width="6"')).join('');
+  const series = (k, a, c, d) => `<g class="s" data-k="${k}">${halo(a)}${path(a, c)}${d}</g>`;
+  for (const a of avgs) g += series(a.k, a.pts, a.color, dots(segments(a.pts).filter(s => s.length === 1).flat(), a.color, 4));
+  g += series('sel', sel, 'var(--ink)', dots(sel, 'var(--ink)', 4));
 
   // 線の右端に系列名（重なったら上下にずらす）
   const ends = [...avgs.map(a => [a.pts, a.short]), [sel, md(day || '') || '']]
@@ -256,6 +272,7 @@ function drawCurve() {
   g += `<rect x="${L}" y="${T}" width="${W - L - R}" height="${H - T - B}" fill="transparent" id="hit"/>`;
   svg.innerHTML = g;
   curve = { avgs, sel, X, x0, x1, L, R, W, day };
+  applyFocus();
   if (cursor != null) moveCursor(cursor);
 }
 
@@ -267,7 +284,7 @@ function moveCursor(s, cx, cy) {
   const d = curve.sel.filter(p => Math.floor(p.x) === s);
   const row = (c, name, v) => `<div><span class="k" style="background:${c}"></span>${name}　<b>${v}</b></div>`;
   const html = `<div>${slotLabel(s)}〜${slotLabel(s + 1)}</div>`
-    + curve.avgs.map(a => { const w = a.pts.find(p => p.s === s); return row(a.color, a.name, w ? `${Math.round(w.v)}分（${w.n}件）` : '—'); }).join('')
+    + ['tt', 'fri', 'we'].map(k => curve.avgs.find(a => a.k === k)).map(a => { /* 凡例と同じ順 */ const w = a.pts.find(p => p.s === s); return row(a.color, a.name, w ? `${Math.round(w.v)}分（${w.n}件）` : '—'); }).join('')
     + row('var(--ink)', esc(md(curve.day || '')) || '選んだ日', d.length ? d.map(p => `${p.t} ${p.v}分`).join('、') : '—');
   const r = $('curve').getBoundingClientRect();
   showTip(html, cx ?? r.left + x, cy ?? r.top + 40);

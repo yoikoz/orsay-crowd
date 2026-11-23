@@ -92,7 +92,13 @@ section:first-child{border-top:0}
 
 /* 推移 */
 .bar{display:flex;flex-wrap:wrap;gap:8px 20px;align-items:center;margin-bottom:12px}
-.key{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--sub)}
+.key{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--sub);height:32px;padding:0 10px;margin:0 -4px;border:1px solid transparent;border-radius:16px;background:none}
+.key:hover{background:var(--plane)}
+.key[aria-pressed="true"]{border-color:var(--border);background:var(--plane);color:var(--ink)}
+.bar.focus .key[aria-pressed="false"]{opacity:.45}
+.fig .s{transition:opacity .15s}
+.fig.focus .s:not(.on){opacity:.15}
+@media (prefers-reduced-motion:reduce){.fig .s{transition:none}}
 .key i{width:14px;height:2px;border-radius:1px;display:inline-block}
 .key i.dot{width:8px;height:8px;border-radius:50%}
 select,textarea,button{font:inherit;color:var(--ink)}
@@ -182,12 +188,13 @@ footer{max-width:960px;margin:0 auto;padding:0 16px 48px;font-size:12px;color:va
     <h2 id="h-curve">時間帯ごとの変化</h2>
     <p class="note">平日（火〜木）・金曜・土日祝それぞれの平均に、選んだ日の実測値を重ねて表示します。金曜は 20:00 まで開室しているので分けています。</p>
     <div class="bar">
-      <span class="key"><i style="background:var(--s1)"></i>平日（火〜木）</span>
-      <span class="key"><i style="background:var(--s3)"></i>金曜</span>
-      <span class="key"><i style="background:var(--s2)"></i>土日祝</span>
-      <span class="key"><i class="dot" style="background:var(--ink)"></i><span id="selKey">選んだ日</span></span>
+      <button type="button" class="key" data-k="tt" aria-pressed="false"><i style="background:var(--s1)"></i>平日（火〜木）</button>
+      <button type="button" class="key" data-k="fri" aria-pressed="false"><i style="background:var(--s3)"></i>金曜</button>
+      <button type="button" class="key" data-k="we" aria-pressed="false"><i style="background:var(--s2)"></i>土日祝</button>
+      <button type="button" class="key" data-k="sel" aria-pressed="false"><i class="dot" style="background:var(--ink)"></i><span id="selKey">選んだ日</span></button>
       <select id="day" aria-label="重ねて表示する日"></select>
     </div>
+    <p class="note" style="margin:-4px 0 8px">凡例を押すと、その線だけを強調できます。</p>
     <div class="fig"><svg id="curve" tabindex="0" role="img" aria-label="時間帯ごとの入場待ち時間。左右キーで時間帯を移動できます"></svg></div>
   </section>
 
