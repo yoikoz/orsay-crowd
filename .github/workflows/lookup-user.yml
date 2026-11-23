@@ -1,0 +1,28 @@
+name: lookup-user
+
+# 一度だけ手動で実行して user id を調べる（ユーザー読み取り1件 = $0.010）
+# 結果をリポジトリ変数 X_USER_ID に登録する
+on:
+  workflow_dispatch:
+    inputs:
+      username:
+        description: 'X のユーザー名（@なし）'
+        required: false
+        default: 'orsay_annai'
+
+permissions:
+  contents: read
+
+jobs:
+  lookup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - env:
+          X_BEARER_TOKEN: ${{ secrets.X_BEARER_TOKEN }}
+          USERNAME: ${{ inputs.username }}
+        run: node scripts/lookup-user.mjs "$USERNAME"

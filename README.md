@@ -22,7 +22,8 @@ data/state.json          since_id・最終取得日時・月ごとの取得件�
    - Variables：`X_USER_ID` = 次の手順で調べた id
 4. **user id を一度だけ調べる**（$0.010）
    ```sh
-   X_BEARER_TOKEN=xxxx node scripts/lookup-user.mjs
+   gh workflow run lookup-user   # Actions 上で実行（トークンは Secrets から読む）。ログに id が出る
+   # ローカルで実行する場合: X_BEARER_TOKEN=xxxx node scripts/lookup-user.mjs
    ```
    トークンはコマンドに直接書かず、`.env` を使うかシェルの履歴に残らない方法で渡してください（`.env` は .gitignore 済み）
 5. **Pages を有効化**：Settings → Pages → Source を「GitHub Actions」にする
