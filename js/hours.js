@@ -66,5 +66,52 @@ export function statusAt(now = new Date()) {
   return { open: true, text: `開室中　${fmt(h.close)} 閉室（入室は ${fmt(h.lastEntry)} まで）` };
 }
 
+/* ---------- 会期中の特別日程（混雑に影響しそうなもの） ---------- */
+// 出典は同じ展覧会ページ。追加・変更があればここに足す
+//   dates: 'YYYY-MM-DD' か [開始, 終了]。weekdaysOnly: 平日（月〜金、休室日を除く）だけ
+const SPECIAL = [
+  { label: '学生無料', detail: '大学・専門学校生は無料（平日のみ）', dates: [['2026-12-08', '2026-12-18']], weekdaysOnly: true },
+];
+// 家族ふれあいの日：毎月第3土曜日と翌日曜日。18歳未満の子を同伴する保護者（都内在住、2名まで）は一般料金の半額
+function familyDays() {
+  const out = [];
+  for (let y = +HOURS.start.slice(0, 4), m = +HOURS.start.slice(5, 7) - 1; ; m++) {
+    const first = new Date(Date.UTC(y, m, 1));
+    if (first.toISOString().slice(0, 10) > HOURS.end) break;
+    const sat = 1 + ((6 - first.getUTCDay() + 7) % 7) + 14; // 第3土曜
+    for (const d of [sat, sat + 1]) {
+      const iso = new Date(Date.UTC(y, m, d)).toISOString().slice(0, 10);
+      if (iso >= HOURS.start && iso <= HOURS.end && !isClosedDay(iso)) out.push(iso);
+    }
+  }
+  return out;
+}
+
+function expand(e) {
+  const days = [];
+  for (const d of e.dates) {
+    const [a, b] = Array.isArray(d) ? d : [d, d];
+    for (let t = Date.parse(a + 'T00:00:00Z'); t <= Date.parse(b + 'T00:00:00Z'); t += 864e5) {
+      const iso = new Date(t).toISOString().slice(0, 10), dow = new Date(t).getUTCDay();
+      if (e.weekdaysOnly && (dow === 0 || dow === 6)) continue;
+      if (!isClosedDay(iso)) days.push(iso);
+    }
+  }
+  return days;
+}
+
+// 特別日程の一覧：[{ label, detail, days: [...] }]
+export function specialSchedule() {
+  return [
+    ...SPECIAL.map(e => ({ label: e.label, detail: e.detail, days: expand(e) })),
+    { label: '家族ふれあいの日', detail: '18歳未満の子と一緒の保護者（都内在住、2名まで）は一般料金の半額', days: familyDays() },
+  ];
+}
+
+// その日に当たる特別日程のラベル
+export function specialOn(date) {
+  return specialSchedule().filter(e => e.days.includes(date)).map(e => e.label);
+}
+
 export const hoursText = () =>
   `${HOURS.open.replace(/^0/, '')}〜${HOURS.close}（金曜は${HOURS.closeByDow[5]}まで）・入室は閉室の${HOURS.lastEntryBefore}分前まで・月曜休室（祝日は開室）`;

@@ -75,6 +75,14 @@ section:first-child{border-top:0}
 .b2{background:var(--b2)!important;color:var(--f2)!important}.b3{background:var(--b3)!important;color:var(--f3)!important}
 .b4{background:var(--b4)!important;color:var(--f4)!important}.b5{background:var(--b5)!important;color:var(--f5)!important}
 .heat .c.x,.scale i.x{background:transparent;box-shadow:inset 0 0 0 1px var(--grid)}
+.cal{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:0 24px;margin:0;font-size:14px}
+.cal dt,.cal dd{margin:0;padding:12px 0;border-top:1px solid var(--grid)}
+.cal dt{color:var(--sub);font-size:13px}
+.cal dd small{display:block;color:var(--sub);font-size:12px;margin-top:2px}
+.cal .past{color:var(--muted)}
+.cal .today{font-weight:600;color:var(--ink)}
+.chip{font-size:11px;color:var(--sub);border:1px solid var(--border);border-radius:4px;padding:0 5px;margin-left:6px;white-space:nowrap}
+@media (max-width:640px){.cal{grid-template-columns:1fr}.cal dd{border-top:0;padding-top:0}}
 .open{margin-top:12px;font-size:13px;color:var(--sub);display:flex;align-items:center;gap:8px}
 .open i{width:8px;height:8px;border-radius:50%;background:var(--axis);flex:none}
 .open i.on{background:var(--ok)}
@@ -180,6 +188,12 @@ footer{max-width:960px;margin:0 auto;padding:0 16px 48px;font-size:12px;color:va
       <select id="day" aria-label="重ねて表示する日"></select>
     </div>
     <div class="fig"><svg id="curve" tabindex="0" role="img" aria-label="時間帯ごとの入場待ち時間。左右キーで時間帯を移動できます"></svg></div>
+  </section>
+
+  <section aria-labelledby="h-cal">
+    <h2 id="h-cal">会期と特別日程</h2>
+    <p class="note">混雑に影響しそうな日程をまとめています。終わった日は薄く表示します。</p>
+    <dl class="cal" id="cal"></dl>
   </section>
 
   <section style="padding-bottom:0">

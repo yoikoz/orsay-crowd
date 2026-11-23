@@ -1,5 +1,5 @@
 import { parse } from './parse.js';
-import { HOURS, entrySlots, allEntrySlots, afterLastEntry, statusAt, hoursText } from './hours.js';
+import { HOURS, entrySlots, allEntrySlots, afterLastEntry, statusAt, hoursText, specialSchedule, specialOn } from './hours.js';
 
 const DOW = ['日', '月', '火', '水', '木', '金', '土'];
 const LS_KEY = 'orsay-local';
@@ -68,8 +68,8 @@ function drawNow(list) {
   const last = list[list.length - 1];
   $('hero').innerHTML = last && last.entry != null ? `${last.entry}<small>分</small>` : '—';
   $('heroAt').textContent = last ? `${md(last.date)}（${dowLabel(last)}）${last.time} 時点` : 'まだ記録がありません';
-  const st = statusAt();
-  $('openNow').innerHTML = `<i class="${st.open ? 'on' : ''}"></i>${esc(st.text)}`;
+  const st = statusAt(), sp = specialOn(todayJST());
+  $('openNow').innerHTML = `<i class="${st.open ? 'on' : ''}"></i>${esc(st.text)}${sp.map(l => `<span class="chip">本日は${esc(l)}</span>`).join('')}`;
   const ent = withEntry(list);
   const max = ent.reduce((m, p) => (!m || p.entry > m.entry ? p : m), null);
   const days = new Set(list.map(p => p.date)).size;
@@ -80,6 +80,40 @@ function drawNow(list) {
     [list.length + '件', `記録数（${days}日分）`],
   ];
   $('stats').innerHTML = items.map(([b, s]) => `<div class="stat"><b>${esc(b)}</b><span>${esc(s)}</span></div>`).join('');
+}
+
+/* ---------- 描画：会期と特別日程 ---------- */
+const todayJST = () => new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
+const DOWS = ['日', '月', '火', '水', '木', '金', '土'];
+const dayLabel = iso => `${md(iso)}（${DOWS[new Date(iso + 'T00:00:00Z').getUTCDay()]}）`;
+
+// 日付の配列を連続した範囲にまとめ、過去・今日・これからで色分けする
+function dayRanges(days) {
+  const today = todayJST(), out = [];
+  for (const d of [...days].sort()) {
+    const last = out[out.length - 1];
+    if (last && Date.parse(d) - Date.parse(last[1]) === 864e5) last[1] = d; else out.push([d, d]);
+  }
+  return out.map(([a, b]) => {
+    const cls = b < today ? 'past' : a <= today && today <= b ? 'today' : '';
+    return `<span class="${cls}">${a === b ? dayLabel(a) : `${dayLabel(a)}〜${dayLabel(b)}`}</span>`;
+  }).join('、');
+}
+
+function drawCal() {
+  const closed = HOURS.closedDates.flatMap(d => (Array.isArray(d) ? [d] : [[d, d]]));
+  const closedHtml = closed.map(([a, b]) => {
+    const cls = b < todayJST() ? 'past' : '';
+    return `<span class="${cls}">${a === b ? dayLabel(a) : `${dayLabel(a)}〜${dayLabel(b)}`}</span>`;
+  }).join('、');
+  const rows = [
+    ['会期', `${HOURS.start.slice(0, 4)}/${dayLabel(HOURS.start)}〜${HOURS.end.slice(0, 4)}/${dayLabel(HOURS.end)}`, ''],
+    ['開室時間', esc(hoursText()), ''],
+    ['休室日', `月曜日、${closedHtml}`, `月曜でも開室：${HOURS.openDates.map(dayLabel).join('、')}`],
+    ...specialSchedule().map(e => [esc(e.label), dayRanges(e.days), esc(e.detail)]),
+  ];
+  $('cal').innerHTML = rows.map(([k, v, s]) => `<dt>${k}</dt><dd>${v}${s ? `<small>${s}</small>` : ''}</dd>`).join('')
+    + `<dt></dt><dd><small>出典：<a href="${HOURS.source}" target="_blank" rel="noopener">東京都美術館 展覧会ページ</a>。変更されることがあるので、来館前に公式情報を確認してください。</small></dd>`;
 }
 
 /* ---------- 描画：狙い目 ---------- */
@@ -150,7 +184,7 @@ let cursor = null;
 function fillDays(list) {
   const days = [...new Set(list.map(p => p.date))].sort().reverse(), cur = $('day').value;
   $('day').innerHTML = days.length
-    ? days.map(d => { const p = list.find(x => x.date === d); return `<option value="${d}">${md(d)}（${dowLabel(p)}）</option>`; }).join('')
+    ? days.map(d => { const p = list.find(x => x.date === d); const sp = specialOn(d); return `<option value="${d}">${md(d)}（${dowLabel(p)}）${sp.length ? '・' + esc(sp.join('・')) : ''}</option>`; }).join('')
     : '<option value="">記録なし</option>';
   if (days.includes(cur)) $('day').value = cur;
 }
@@ -246,7 +280,7 @@ function drawRows(list) {
   $('recCount').textContent = `${list.length}件`;
   $('rows').innerHTML = list.length
     ? [...list].reverse().map(p => `<tr>
-        <td>${esc(md(p.date))}（${dowLabel(p)}）</td><td class="n">${esc(p.time)}</td>
+        <td>${esc(md(p.date))}（${dowLabel(p)}）${specialOn(p.date).map(l => `<span class="chip">${esc(l)}</span>`).join('')}</td><td class="n">${esc(p.time)}</td>
         <td class="n">${p.entry != null ? p.entry + '分' : afterLastEntry(p.dow, p.time) ? '入室終了' : '—'}</td><td class="n">${p.shop == null ? '—' : p.shop + '分'}</td>
         <td><span class="tag">${SRC[p.src] || '—'}</span></td>
         <td>${p.src === 'local' ? `<button data-del="${esc(p.id)}" aria-label="${esc(p.date + ' ' + p.time)} を削除">削除</button>` : ''}</td></tr>`).join('')
@@ -310,7 +344,7 @@ function setStatus() {
 
 function render() {
   const list = all();
-  drawNow(list); drawBest(list); drawHeat(list); fillDays(list); drawCurve(); drawRows(list); setStatus();
+  drawNow(list); drawBest(list); drawHeat(list); fillDays(list); drawCurve(); drawCal(); drawRows(list); setStatus();
 }
 
 loadLocal();

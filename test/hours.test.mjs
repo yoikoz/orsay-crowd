@@ -1,6 +1,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { isClosedDay, entrySlots, allEntrySlots, afterLastEntry, statusAt } from '../js/hours.js';
+import { isClosedDay, entrySlots, allEntrySlots, afterLastEntry, statusAt, specialSchedule, specialOn } from '../js/hours.js';
+
+test('特別日程', () => {
+  const [student, family] = specialSchedule();
+  assert.deepEqual(student.days, ['2026-12-08', '2026-12-09', '2026-12-10', '2026-12-11', '2026-12-15', '2026-12-16', '2026-12-17', '2026-12-18']);
+  assert.deepEqual(family.days, ['2026-11-21', '2026-11-22', '2026-12-19', '2026-12-20', '2027-01-16', '2027-01-17', '2027-02-20', '2027-02-21', '2027-03-20', '2027-03-21']);
+  assert.deepEqual(specialOn('2026-11-21'), ['家族ふれあいの日']);
+  assert.deepEqual(specialOn('2026-11-25'), []);
+});
 
 test('休室日', () => {
   assert.equal(isClosedDay('2026-11-16'), true);  // 月曜
