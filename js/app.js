@@ -1,4 +1,5 @@
 import { parse } from './parse.js';
+import { HOURS, entrySlots, allEntrySlots, afterLastEntry, statusAt, hoursText } from './hours.js';
 
 const DOW = ['日', '月', '火', '水', '木', '金', '土'];
 const LS_KEY = 'orsay-local';
@@ -43,7 +44,8 @@ function bySlot(list, f) {
 
 function slotRange(list) {
   const ss = withEntry(list).map(p => slotOf(p.time));
-  return [Math.min(19, ...ss), Math.max(34, ...ss)]; // 開館 9:30 〜 17:00 台を最低限表示
+  const [lo, hi] = entrySlots(2); // 通常日の入室受付時間（9:30〜16:30台）は常に表示
+  return [Math.min(lo, ...ss), Math.max(hi, ...ss)];
 }
 
 const BINS = [15, 30, 45, 60, 90]; // 0-14 / 15-29 / 30-44 / 45-59 / 60-89 / 90+
@@ -66,6 +68,8 @@ function drawNow(list) {
   const last = list[list.length - 1];
   $('hero').innerHTML = last && last.entry != null ? `${last.entry}<small>分</small>` : '—';
   $('heroAt').textContent = last ? `${md(last.date)}（${dowLabel(last)}）${last.time} 時点` : 'まだ記録がありません';
+  const st = statusAt();
+  $('openNow').innerHTML = `<i class="${st.open ? 'on' : ''}"></i>${esc(st.text)}`;
   const ent = withEntry(list);
   const max = ent.reduce((m, p) => (!m || p.entry > m.entry ? p : m), null);
   const days = new Set(list.map(p => p.date)).size;
@@ -80,7 +84,7 @@ function drawNow(list) {
 
 /* ---------- 描画：狙い目 ---------- */
 function drawBest(list) {
-  const groups = [['平日（月〜金）', p => !isWeekend(p)], ['土日祝', isWeekend]];
+  const groups = [['平日（火〜金）', p => !isWeekend(p)], ['土日祝', isWeekend]];
   $('best').innerHTML = groups.map(([name, f]) => {
     const sr = bySlot(list, f);
     if (!sr.length) return `<div class="card"><h3>${name}</h3><p>まだデータがありません</p></div>`;
@@ -96,17 +100,23 @@ function drawBest(list) {
 
 /* ---------- 描画：ヒートマップ ---------- */
 function drawHeat(list) {
-  const ent = withEntry(list), [lo, hi] = slotRange(list);
+  const ent = withEntry(list), [lo0, hi0] = allEntrySlots(), ss = ent.map(p => slotOf(p.time));
+  const lo = Math.min(lo0, ...ss), hi = Math.max(hi0, ...ss);
   const cols = []; for (let s = lo; s <= hi; s++) cols.push(s);
-  const rows = [[1, '月'], [2, '火'], [3, '水'], [4, '木'], [5, '金'], [6, '土'], [0, '日'], [7, '祝']];
+  // 月曜は休室（祝日の月曜は「祝」の行に入る）。祝日でない月曜の記録があるときだけ行を出す
+  const monday = ent.some(p => !p.hol && p.dow === 1);
+  const rows = [[1, '月'], [2, '火'], [3, '水'], [4, '木'], [5, '金'], [6, '土'], [0, '日'], [7, '祝']]
+    .filter(([r]) => r !== 1 || monday);
   let h = '<div role="row" style="display:contents"><div></div>' +
     cols.map(s => `<div class="h" role="columnheader">${s % 2 ? '' : slotLabel(s)}</div>`).join('') + '</div>';
   for (const [r, name] of rows) {
     h += `<div role="row" style="display:contents"><div class="r" role="rowheader">${name}</div>`;
     for (const s of cols) {
       const vs = ent.filter(p => (p.hol ? 7 : p.dow) === r && slotOf(p.time) === s).map(p => p.entry);
-      const v = avg(vs);
-      h += v == null
+      const v = avg(vs), [eLo, eHi] = entrySlots(r === 7 ? 2 : r); // 祝日は通常の時間
+      h += v == null && (s < eLo || s > eHi)
+        ? `<div class="c x" role="gridcell" aria-label="${name} ${slotLabel(s)} 入室受付時間外"></div>`
+        : v == null
         ? `<div class="c" role="gridcell" aria-label="${name} ${slotLabel(s)} データなし"></div>`
         : `<div class="c b${binOf(v)}" role="gridcell" tabindex="0" data-v="${name === '祝' ? '祝日' : name + '曜'} ${slotLabel(s)}〜|${Math.round(v)}|${vs.length}" aria-label="${name} ${slotLabel(s)} 平均${Math.round(v)}分 ${vs.length}件">${Math.round(v)}</div>`;
     }
@@ -117,7 +127,8 @@ function drawHeat(list) {
   el.style.minWidth = 28 + cols.length * 34 + 'px';
   el.innerHTML = h;
   const labels = ['〜14分', '15〜29', '30〜44', '45〜59', '60〜89', '90分〜'];
-  $('scale').innerHTML = labels.map((l, i) => `<span><i class="b${i}"></i>${l}</span>`).join('') + '<span><i style="background:var(--plane)"></i>データなし</span>';
+  $('scale').innerHTML = labels.map((l, i) => `<span><i class="b${i}"></i>${l}</span>`).join('') + '<span><i style="background:var(--plane)"></i>データなし</span><span><i class="x"></i>入室受付時間外</span>';
+  $('hours').innerHTML = `開室時間：${esc(hoursText())}（<a href="${HOURS.source}" target="_blank" rel="noopener">東京都美術館</a>）`;
 }
 function heatTip(e) {
   const c = e.target.closest('.c[data-v]');
@@ -236,7 +247,7 @@ function drawRows(list) {
   $('rows').innerHTML = list.length
     ? [...list].reverse().map(p => `<tr>
         <td>${esc(md(p.date))}（${dowLabel(p)}）</td><td class="n">${esc(p.time)}</td>
-        <td class="n">${p.entry == null ? '—' : p.entry + '分'}</td><td class="n">${p.shop == null ? '—' : p.shop + '分'}</td>
+        <td class="n">${p.entry != null ? p.entry + '分' : afterLastEntry(p.dow, p.time) ? '入室終了' : '—'}</td><td class="n">${p.shop == null ? '—' : p.shop + '分'}</td>
         <td><span class="tag">${SRC[p.src] || '—'}</span></td>
         <td>${p.src === 'local' ? `<button data-del="${esc(p.id)}" aria-label="${esc(p.date + ' ' + p.time)} を削除">削除</button>` : ''}</td></tr>`).join('')
     : '<tr><td colspan="6" class="sub">まだ記録がありません</td></tr>';

@@ -69,7 +69,8 @@ const crowd = fetched.filter(t => isCrowdPost(t.text));
 const records = [], failures = [];
 for (const t of crowd) {
   const rs = parse(t.text, t.created_at ? new Date(t.created_at) : new Date());
-  if (!rs.length || rs.every(r => r.entry == null)) failures.push(t);
+  // 「最終入場は終了しております」のようなお知らせは失敗扱いにしない（待ち時間は null のまま記録）
+  if (!rs.length || (rs.every(r => r.entry == null) && !/終了/.test(t.text))) failures.push(t);
   for (const r of rs) records.push({ ...r, src: 'api', tid: t.id });
 }
 
