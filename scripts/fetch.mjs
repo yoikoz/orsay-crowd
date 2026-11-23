@@ -4,6 +4,7 @@
 //   X_BEARER_TOKEN  必須（Secrets）
 //   X_USER_ID       必須（リポジトリ変数。lookup-user.mjs で調べた値）
 //   START_TIME      任意。since_id が未保存のときの取得開始（ISO8601）。省略時は当日 0:00 JST
+//   BACKFILL        任意。"true" なら since_id を無視して過去分を取り込む（START_TIME 省略時は期間指定なし＝API で遡れる最大 3200件）
 //   MOCK_FILE       任意。API を呼ばず、このJSON（レスポンス1件 or 配列）を使う（ローカル検証用）
 import { readFile } from 'node:fs/promises';
 import { parse, isCrowdPost } from '../js/parse.js';
@@ -12,6 +13,7 @@ import { PATHS, PRICE, USER_ID, readJSON, writeJSON, writePosts, merge, jstNow, 
 const API = 'https://api.x.com/2';
 const token = process.env.X_BEARER_TOKEN;
 const mock = process.env.MOCK_FILE;
+const backfill = process.env.BACKFILL === 'true';
 
 if (!mock && !token) fail('X_BEARER_TOKEN が設定されていません');
 if (!mock && !/^\d+$/.test(USER_ID)) fail('X_USER_ID が設定されていません（scripts/lookup-user.mjs で調べてください）');
@@ -31,8 +33,9 @@ let fieldsParam = 'post.fields';
 
 async function getPage(paginationToken) {
   const q = new URLSearchParams({ max_results: '100', exclude: 'retweets,replies', [fieldsParam]: 'created_at' });
-  if (state.since_id) q.set('since_id', state.since_id);
-  else q.set('start_time', process.env.START_TIME || todayStartJST());
+  if (state.since_id && !backfill) q.set('since_id', state.since_id);
+  else if (process.env.START_TIME) q.set('start_time', process.env.START_TIME);
+  else if (!backfill) q.set('start_time', todayStartJST());
   if (paginationToken) q.set('pagination_token', paginationToken);
 
   const res = await fetch(`${API}/users/${USER_ID}/tweets?${q}`, { headers: { Authorization: `Bearer ${token}` } });
@@ -58,7 +61,7 @@ if (mock) {
     const page = await getPage(next);
     pages.push(page);
     next = page.meta?.next_token;
-  } while (next && pages.length < 20);
+  } while (next && pages.length < (backfill ? 40 : 20)); // 100件×40ページ = API の上限 3200件
 }
 
 const fetched = pages.flatMap(p => p.data || []);
@@ -75,6 +78,7 @@ await writePosts(list);
 
 // ---- 状態とコスト ----
 const ids = fetched.map(t => BigInt(t.id));
+if (state.since_id) ids.push(BigInt(state.since_id)); // 遡って取り込んでも since_id は戻さない
 if (ids.length) state.since_id = ids.reduce((a, b) => (a > b ? a : b)).toString();
 state.last_run = new Date().toISOString();
 const month = jstNow().slice(0, 7);
@@ -90,7 +94,7 @@ await writeJSON(PATHS.state, state);
 
 // ---- ログ ----
 const lines = [
-  `取得日時        ${jstNow()}${mock ? '（MOCK）' : ''}`,
+  `取得日時        ${jstNow()}${mock ? '（MOCK）' : ''}${backfill ? '（過去分の取り込み）' : ''}`,
   `リクエスト数    ${pages.length}`,
   `取得ポスト数    ${fetched.length}（うち混雑状況 ${crowd.length}、それ以外は破棄 ${fetched.length - crowd.length}）`,
   `レコード        新規 ${added} / 更新 ${updated} / 合計 ${list.length}`,
