@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>オルセー展 混雑ログ</title>
+<meta name="description" content="東京都美術館「オルセー美術館所蔵 いまを生きる歓び展」の入場待ち時間の記録と、空いている時間帯">
+<style>
+:root{
+  color-scheme:light;
+  --bg:#fcfcfb; --plane:#f2f2ef; --ink:#0b0b0b; --sub:#52514e; --muted:#898781;
+  --grid:#e1e0d9; --axis:#c3c2b7; --border:rgba(11,11,11,.10);
+  --s1:#2a78d6; --s2:#eb6834; --ok:#006300; --ng:#d03b3b;
+  --b0:#cde2fb; --b1:#9ec5f4; --b2:#5598e7; --b3:#2a78d6; --b4:#1c5cab; --b5:#0d366b;
+  --f0:#0b0b0b; --f1:#0b0b0b; --f2:#fff; --f3:#fff; --f4:#fff; --f5:#fff;
+}
+@media (prefers-color-scheme:dark){
+  :root:where(:not([data-theme="light"])){
+    color-scheme:dark;
+    --bg:#1a1a19; --plane:#242423; --ink:#f0efec; --sub:#c3c2b7; --muted:#898781;
+    --grid:#2c2c2a; --axis:#383835; --border:rgba(255,255,255,.10);
+    --s1:#3987e5; --s2:#d95926; --ok:#0ca30c; --ng:#e66767;
+    --b0:#0d366b; --b1:#184f95; --b2:#256abf; --b3:#3987e5; --b4:#6da7ec; --b5:#b7d3f6;
+    --f0:#f0efec; --f1:#f0efec; --f2:#fff; --f3:#fff; --f4:#0b0b0b; --f5:#0b0b0b;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#1a1a19; --plane:#242423; --ink:#f0efec; --sub:#c3c2b7; --muted:#898781;
+  --grid:#2c2c2a; --axis:#383835; --border:rgba(255,255,255,.10);
+  --s1:#3987e5; --s2:#d95926; --ok:#0ca30c; --ng:#e66767;
+  --b0:#0d366b; --b1:#184f95; --b2:#256abf; --b3:#3987e5; --b4:#6da7ec; --b5:#b7d3f6;
+  --f0:#f0efec; --f1:#f0efec; --f2:#fff; --f3:#fff; --f4:#0b0b0b; --f5:#0b0b0b;
+}
+*{box-sizing:border-box;min-width:0}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.7 system-ui,-apple-system,"Hiragino Sans","Noto Sans JP","Segoe UI",sans-serif;overflow-x:clip}
+main{max-width:960px;margin:0 auto;padding:0 16px 64px}
+header{max-width:960px;margin:0 auto;padding:32px 16px 8px;display:flex;flex-wrap:wrap;gap:4px 16px;align-items:baseline;justify-content:space-between}
+h1{font-size:17px;font-weight:600;margin:0;letter-spacing:.02em}
+h2{font-size:15px;font-weight:600;margin:0 0 4px}
+.sub{color:var(--sub);font-size:13px}
+section{padding:36px 0;border-top:1px solid var(--grid)}
+section:first-child{border-top:0}
+.note{color:var(--sub);font-size:13px;margin:0 0 16px}
+
+/* 最新 */
+.now{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);gap:24px 48px;align-items:end;padding-top:20px}
+.label{font-size:13px;color:var(--sub)}
+.hero{font-size:clamp(64px,14vw,112px);font-weight:600;line-height:1;letter-spacing:-.02em;margin:6px 0 10px}
+.hero small{font-size:.28em;font-weight:500;letter-spacing:0;margin-left:4px;color:var(--sub)}
+.stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0;border-top:1px solid var(--grid)}
+.stat{padding:12px 0;border-bottom:1px solid var(--grid)}
+.stat:nth-child(odd){padding-right:16px}
+.stat b{display:block;font-size:22px;font-weight:600;line-height:1.3}
+.stat span{font-size:12px;color:var(--sub)}
+
+/* 狙い目 */
+.best{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.card{border:1px solid var(--border);border-radius:10px;padding:16px 18px}
+.card h3{font-size:13px;font-weight:600;margin:0 0 10px;color:var(--sub)}
+.card .t{font-size:26px;font-weight:600;line-height:1.2}
+.card .t small{font-size:14px;font-weight:500;color:var(--sub);margin-left:6px}
+.card p{margin:6px 0 0;font-size:13px;color:var(--sub)}
+
+/* ヒートマップ */
+.scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.heat{display:grid;gap:2px;font-size:12px;font-variant-numeric:tabular-nums}
+.heat .h{color:var(--muted);font-size:11px;white-space:nowrap;padding-bottom:2px}
+.heat .r{color:var(--sub);align-self:center;white-space:nowrap}
+.heat .c{height:30px;border-radius:4px;display:flex;align-items:center;justify-content:center;background:var(--plane);color:var(--sub)}
+.heat .c[data-v]{cursor:default}
+.heat .c:focus-visible{outline:2px solid var(--ink);outline-offset:1px}
+.b0{background:var(--b0)!important;color:var(--f0)!important}.b1{background:var(--b1)!important;color:var(--f1)!important}
+.b2{background:var(--b2)!important;color:var(--f2)!important}.b3{background:var(--b3)!important;color:var(--f3)!important}
+.b4{background:var(--b4)!important;color:var(--f4)!important}.b5{background:var(--b5)!important;color:var(--f5)!important}
+.scale{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:12px;font-size:12px;color:var(--sub)}
+.scale span{display:inline-flex;align-items:center;gap:5px}
+.scale i{width:14px;height:14px;border-radius:3px;display:inline-block}
+
+/* 推移 */
+.bar{display:flex;flex-wrap:wrap;gap:8px 20px;align-items:center;margin-bottom:12px}
+.key{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--sub)}
+.key i{width:14px;height:2px;border-radius:1px;display:inline-block}
+.key i.dot{width:8px;height:8px;border-radius:50%}
+select,textarea,button{font:inherit;color:var(--ink)}
+select{height:36px;padding:0 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);font-size:14px}
+.fig{position:relative;height:300px}
+.fig svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.fig svg:focus-visible{outline:2px solid var(--ink);outline-offset:4px;border-radius:4px}
+
+/* 記録・追加 */
+details{border-top:1px solid var(--grid);padding:4px 0}
+details:last-of-type{border-bottom:1px solid var(--grid)}
+summary{cursor:pointer;padding:14px 0;font-weight:600;list-style:none;display:flex;justify-content:space-between;gap:12px}
+summary::-webkit-details-marker{display:none}
+summary::after{content:"+";color:var(--sub);font-weight:400}
+details[open] summary::after{content:"−"}
+summary .sub{font-weight:400;margin-left:auto}
+.inner{padding:4px 0 20px}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{padding:8px 6px;border-bottom:1px solid var(--grid);text-align:left;white-space:nowrap}
+th{font-weight:500;color:var(--sub);font-size:12px}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
+.tag{font-size:11px;color:var(--sub);border:1px solid var(--border);border-radius:4px;padding:1px 6px}
+textarea{width:100%;min-height:150px;padding:12px;border:1px solid var(--border);border-radius:8px;background:var(--bg);font-size:14px;line-height:1.6;resize:vertical}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:12px}
+button{height:36px;padding:0 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg);font-size:14px;cursor:pointer}
+button:hover{background:var(--plane)}
+button.pri{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+button.pri:hover{opacity:.85}
+td button{height:28px;padding:0 10px;font-size:12px}
+button:focus-visible,select:focus-visible,textarea:focus-visible,summary:focus-visible,a:focus-visible{outline:2px solid var(--s1);outline-offset:2px}
+.preview{font-size:13px;margin-top:10px}
+.ok{color:var(--ok)}.ng{color:var(--ng)}
+a{color:inherit;text-underline-offset:3px}
+ol{padding-left:20px;margin:8px 0 0;font-size:13px;color:var(--sub)}
+footer{max-width:960px;margin:0 auto;padding:0 16px 48px;font-size:12px;color:var(--sub)}
+
+/* ツールチップ */
+#tip{position:fixed;z-index:10;pointer-events:none;background:var(--bg);color:var(--ink);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:12px;line-height:1.6;box-shadow:0 4px 16px rgba(0,0,0,.12);opacity:0;transition:opacity .1s;white-space:nowrap}
+#tip.on{opacity:1}
+#tip b{font-weight:600}
+#tip .k{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:1px}
+
+@media (max-width:640px){
+  header{padding-top:24px}
+  .now{grid-template-columns:1fr;gap:16px}
+  .best{grid-template-columns:1fr}
+  .fig{height:260px}
+  section{padding:28px 0}
+}
+@media (prefers-reduced-motion:reduce){#tip{transition:none}}
+</style>
+</head>
+<body>
+<header>
+  <h1>オルセー美術館展 混雑ログ</h1>
+  <span class="sub" id="status">読み込み中…</span>
+</header>
+
+<main>
+  <section aria-labelledby="h-now">
+    <h2 id="h-now" class="label" style="font-weight:400">いまの入場待ち</h2>
+    <div class="now">
+      <div>
+        <div class="hero" id="hero">—</div>
+        <div class="sub" id="heroAt"></div>
+      </div>
+      <div class="stats" id="stats"></div>
+    </div>
+  </section>
+
+  <section aria-labelledby="h-best">
+    <h2 id="h-best">狙い目の時間帯</h2>
+    <p class="note">30分ごとの平均入場待ちから、空いている時間帯と混む時間帯を出しています。</p>
+    <div class="best" id="best"></div>
+  </section>
+
+  <section aria-labelledby="h-heat">
+    <h2 id="h-heat">曜日 × 時間帯</h2>
+    <p class="note">30分ごとの平均入場待ち（分）。祝日は曜日とは別の行にまとめています。</p>
+    <div class="scroll"><div class="heat" id="heat" role="grid" aria-label="曜日と時間帯ごとの平均入場待ち時間"></div></div>
+    <div class="scale" id="scale"></div>
+  </section>
+
+  <section aria-labelledby="h-curve">
+    <h2 id="h-curve">時間帯ごとの変化</h2>
+    <p class="note">平日と土日祝の平均に、選んだ日の実測値を重ねて表示します。</p>
+    <div class="bar">
+      <span class="key"><i style="background:var(--s1)"></i>平日平均</span>
+      <span class="key"><i style="background:var(--s2)"></i>土日祝平均</span>
+      <span class="key"><i class="dot" style="background:var(--ink)"></i><span id="selKey">選んだ日</span></span>
+      <select id="day" aria-label="重ねて表示する日"></select>
+    </div>
+    <div class="fig"><svg id="curve" tabindex="0" role="img" aria-label="時間帯ごとの入場待ち時間。左右キーで時間帯を移動できます"></svg></div>
+  </section>
+
+  <section style="padding-bottom:0">
+    <details id="recBox">
+      <summary>記録一覧 <span class="sub" id="recCount"></span></summary>
+      <div class="inner">
+        <div class="row" style="margin:0 0 12px"><button id="csv">CSVをダウンロード</button></div>
+        <div class="scroll"><table>
+          <thead><tr><th>日付</th><th class="n">時刻</th><th class="n">入場待ち</th><th class="n">会計待ち</th><th>取得元</th><th></th></tr></thead>
+          <tbody id="rows"></tbody>
+        </table></div>
+      </div>
+    </details>
+    <details>
+      <summary>ポストを手動で追加</summary>
+      <div class="inner">
+        <p class="note">自動取得で漏れたポストの補完用です。X のポスト本文をそのまま貼り付けてください（複数件まとめて貼っても大丈夫です）。</p>
+        <textarea id="paste" placeholder="【オルセー美術館所蔵　いまを生きる歓び展  会場混雑状況】&#10;11月23日 (月・祝) 11：40 現在&#10;只今、入場までの待ち時間は50分です。&#10;ショップのお会計待ち時間は約10分です。"></textarea>
+        <div class="preview" id="preview" aria-live="polite"></div>
+        <div class="row">
+          <button class="pri" id="saveLocal">この端末に保存</button>
+          <button id="copyAct">Actions用にコピー</button>
+          <span class="sub" id="copyMsg" aria-live="polite"></span>
+        </div>
+        <ol>
+          <li>「この端末に保存」は、このブラウザだけに反映されます（すぐに確認したいとき用）。</li>
+          <li>全員に反映するには「Actions用にコピー」を押して、<a id="actLink" href="#" target="_blank" rel="noopener">GitHub Actions の manual-add</a> → Run workflow の text 欄に貼り付けて実行します。</li>
+        </ol>
+      </div>
+    </details>
+  </section>
+</main>
+
+<footer>
+  データの出典：<a href="https://x.com/orsay_annai" target="_blank" rel="noopener">@orsay_annai</a> の会場混雑状況ポスト（毎日 21時ごろ自動取得）。非公式の記録です。
+</footer>
+
+<div id="tip" role="tooltip"></div>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

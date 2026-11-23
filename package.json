@@ -1,0 +1,12 @@
+{
+  "name": "orsay-crowd",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "fetch": "node scripts/fetch.mjs",
+    "lookup-user": "node scripts/lookup-user.mjs",
+    "serve": "python3 -m http.server 8000"
+  }
+}

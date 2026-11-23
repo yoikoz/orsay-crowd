@@ -1,0 +1,53 @@
+name: manual-add
+
+on:
+  workflow_dispatch:
+    inputs:
+      text:
+        description: 'ポスト本文（サイトの「Actions用にコピー」で1行にしたものを貼り付け）'
+        required: false
+        default: ''
+      delete_ids:
+        description: '削除する id（例: 20261123-1140。複数はカンマ区切り）'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+concurrency:
+  group: data
+  cancel-in-progress: false
+
+jobs:
+  add:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Add / delete records
+        env:
+          # 入力はスクリプトに直接埋め込まず環境変数で渡す（シェルインジェクション対策）
+          TEXT: ${{ inputs.text }}
+          DELETE_IDS: ${{ inputs.delete_ids }}
+        run: node scripts/add-manual.mjs
+      - name: Commit data
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add data/
+          git diff --cached --quiet && exit 0
+          git commit -m "data: manual add/delete"
+          git pull --rebase
+          git push
+
+  deploy:
+    needs: add
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    uses: ./.github/workflows/pages.yml

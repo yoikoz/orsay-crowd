@@ -1,0 +1,53 @@
+name: fetch
+
+on:
+  schedule:
+    - cron: '0 12 * * *' # 毎日 UTC 12:00 = JST 21:00（GitHub 側の都合で数分〜数十分遅れることがある）
+  workflow_dispatch:
+    inputs:
+      start_time:
+        description: 'since_id が未保存のときの取得開始（例: 2026-11-01T00:00:00+09:00）。空なら当日0時(JST)'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+concurrency:
+  group: data
+  cancel-in-progress: false
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Test parser
+        run: npm test
+      - name: Fetch posts from X API
+        env:
+          X_BEARER_TOKEN: ${{ secrets.X_BEARER_TOKEN }}
+          X_USER_ID: ${{ vars.X_USER_ID }}
+          START_TIME: ${{ inputs.start_time }}
+        run: node scripts/fetch.mjs
+      - name: Commit data
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add data/
+          # state.json の last_run が毎回変わるので、ポストがない日もコミットされる（60日無操作で cron が止まるのを防ぐ）
+          git diff --cached --quiet || git commit -m "data: fetch $(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M')"
+          git pull --rebase
+          git push
+
+  deploy:
+    needs: fetch
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    uses: ./.github/workflows/pages.yml
