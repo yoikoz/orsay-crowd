@@ -189,24 +189,30 @@ function fillDays(list) {
   if (days.includes(cur)) $('day').value = cur;
 }
 
+// 推移グラフの平均系列。色は系列に固定（並び順で塗り替えない）。祝日の金曜は土日祝に入る
+const AVG_SERIES = [
+  { name: '平日平均（火〜木）', short: '火〜木', color: 'var(--s1)', f: p => !isWeekend(p) && p.dow !== 5 },
+  { name: '金曜平均', short: '金', color: 'var(--s3)', f: p => !isWeekend(p) && p.dow === 5 },
+  { name: '土日祝平均', short: '土日祝', color: 'var(--s2)', f: isWeekend },
+];
+
 function drawCurve() {
   const svg = $('curve'), W = svg.clientWidth, H = svg.clientHeight;
   if (!W) return;
   const list = all(), day = $('day').value;
   const dayP = list.find(p => p.date === day);
   $('selKey').textContent = dayP ? `${md(day)}（${dowLabel(dayP)}）` : '選んだ日';
-  const wk = bySlot(list, p => !isWeekend(p)).map(d => ({ x: d.s, ...d }));
-  const we = bySlot(list, isWeekend).map(d => ({ x: d.s, ...d }));
+  const avgs = AVG_SERIES.map(sr => ({ ...sr, pts: bySlot(list, sr.f).map(d => ({ x: d.s, ...d })) }));
   const sel = withEntry(list).filter(p => p.date === day)
     .map(p => { const [h, m] = p.time.split(':').map(Number); return { x: h * 2 + m / 30, v: p.entry, t: p.time }; });
-  if (!wk.length && !we.length && !sel.length) {
+  if (avgs.every(a => !a.pts.length) && !sel.length) {
     svg.innerHTML = `<text x="${W / 2}" y="${H / 2}" text-anchor="middle" fill="var(--sub)" font-size="13">記録がたまるとグラフが表示されます</text>`;
     curve = null; return;
   }
   const narrow = W < 520;
   const L = 34, R = narrow ? 52 : 64, T = 26, B = 28;
   const [x0, x1] = slotRange(list);
-  const vmax = Math.max(30, ...[...wk, ...we, ...sel].map(d => d.v));
+  const vmax = Math.max(30, ...[...avgs.flatMap(a => a.pts), ...sel].map(d => d.v));
   const step = vmax > 120 ? 60 : vmax > 60 ? 30 : 15;
   const yMax = Math.ceil(vmax / step) * step;
   const X = x => L + (x - x0) / (x1 - x0 || 1) * (W - L - R);
@@ -221,22 +227,35 @@ function drawCurve() {
   for (let h = Math.ceil(x0 / 2); h <= Math.floor(x1 / 2); h += narrow ? 2 : 1)
     g += `<text x="${X(h * 2)}" y="${H - 8}" text-anchor="middle" font-size="11" fill="var(--muted)">${h}時</text>`;
 
-  const path = (a, c) => a.length > 1 ? `<polyline points="${a.map(d => X(d.x) + ',' + Y(d.v)).join(' ')}" fill="none" stroke="${c}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>` : '';
+  // 1時間を超えてデータが空いたところでは線を切る（データのない区間を直線で補わない）
+  const segments = a => a.reduce((out, d, i) => {
+    if (i && d.x - a[i - 1].x > 2) out.push([]);
+    out[out.length - 1].push(d); return out;
+  }, [[]]).filter(s => s.length);
+  const line = (s, c) => `<polyline points="${s.map(d => X(d.x) + ',' + Y(d.v)).join(' ')}" fill="none" stroke="${c}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+  const path = (a, c) => segments(a).filter(s => s.length > 1).map(s => line(s, c)).join('');
   const dots = (a, c, r) => a.map(d => `<circle cx="${X(d.x)}" cy="${Y(d.v)}" r="${r}" fill="${c}" stroke="var(--bg)" stroke-width="2"/>`).join('');
-  g += path(wk, 'var(--s1)') + path(we, 'var(--s2)') + path(sel, 'var(--ink)');
-  g += dots(wk.length === 1 ? wk : [], 'var(--s1)', 4) + dots(we.length === 1 ? we : [], 'var(--s2)', 4) + dots(sel, 'var(--ink)', 4);
+  // 平均の線には点を打たない（前後とつながらない孤立した点だけ点で示す）。選んだ日は実測なので全点に打つ
+  for (const a of avgs) g += path(a.pts, a.color) + dots(segments(a.pts).filter(s => s.length === 1).flat(), a.color, 4);
+  g += path(sel, 'var(--ink)') + dots(sel, 'var(--ink)', 4);
 
   // 線の右端に系列名（重なったら上下にずらす）
-  const ends = [[wk, '平日', 'var(--s1)'], [we, '土日祝', 'var(--s2)'], [sel, md(day || '') || '', 'var(--ink)']]
+  const ends = [...avgs.map(a => [a.pts, a.short]), [sel, md(day || '') || '']]
     .filter(([a]) => a.length).map(([a, name]) => ({ name, y: Y(a[a.length - 1].v), x: X(a[a.length - 1].x) }))
     .sort((a, b) => a.y - b.y);
   for (let i = 1; i < ends.length; i++) if (ends[i].y - ends[i - 1].y < 14) ends[i].y = ends[i - 1].y + 14;
+  // 下にはみ出したら、下から上へ押し戻す
+  const yLimit = H - B - 2;
+  for (let i = ends.length - 1; i >= 0; i--) {
+    const lim = i === ends.length - 1 ? yLimit : ends[i + 1].y - 14;
+    if (ends[i].y > lim) ends[i].y = lim;
+  }
   g += ends.map(e => `<text x="${e.x + 8}" y="${e.y + 4}" font-size="12" fill="var(--sub)">${esc(e.name)}</text>`).join('');
 
   g += `<line id="xh" y1="${T}" y2="${H - B}" stroke="var(--axis)" stroke-width="1" visibility="hidden"/>`;
   g += `<rect x="${L}" y="${T}" width="${W - L - R}" height="${H - T - B}" fill="transparent" id="hit"/>`;
   svg.innerHTML = g;
-  curve = { wk, we, sel, X, x0, x1, L, R, W, day };
+  curve = { avgs, sel, X, x0, x1, L, R, W, day };
   if (cursor != null) moveCursor(cursor);
 }
 
@@ -245,13 +264,10 @@ function moveCursor(s, cx, cy) {
   s = Math.max(curve.x0, Math.min(curve.x1, s)); cursor = s;
   const xh = $('xh'), x = curve.X(s);
   xh.setAttribute('x1', x); xh.setAttribute('x2', x); xh.setAttribute('visibility', 'visible');
-  const at = a => a.find(d => d.s === s);
-  const w = at(curve.wk), e = at(curve.we);
   const d = curve.sel.filter(p => Math.floor(p.x) === s);
   const row = (c, name, v) => `<div><span class="k" style="background:${c}"></span>${name}　<b>${v}</b></div>`;
   const html = `<div>${slotLabel(s)}〜${slotLabel(s + 1)}</div>`
-    + row('var(--s1)', '平日平均', w ? `${Math.round(w.v)}分（${w.n}件）` : '—')
-    + row('var(--s2)', '土日祝平均', e ? `${Math.round(e.v)}分（${e.n}件）` : '—')
+    + curve.avgs.map(a => { const w = a.pts.find(p => p.s === s); return row(a.color, a.name, w ? `${Math.round(w.v)}分（${w.n}件）` : '—'); }).join('')
     + row('var(--ink)', esc(md(curve.day || '')) || '選んだ日', d.length ? d.map(p => `${p.t} ${p.v}分`).join('、') : '—');
   const r = $('curve').getBoundingClientRect();
   showTip(html, cx ?? r.left + x, cy ?? r.top + 40);

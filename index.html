@@ -10,7 +10,7 @@
   color-scheme:light;
   --bg:#fcfcfb; --plane:#f2f2ef; --ink:#0b0b0b; --sub:#52514e; --muted:#898781;
   --grid:#e1e0d9; --axis:#c3c2b7; --border:rgba(11,11,11,.10);
-  --s1:#2a78d6; --s2:#eb6834; --ok:#006300; --ng:#d03b3b;
+  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --ok:#006300; --ng:#d03b3b;
   --b0:#cde2fb; --b1:#9ec5f4; --b2:#5598e7; --b3:#2a78d6; --b4:#1c5cab; --b5:#0d366b;
   --f0:#0b0b0b; --f1:#0b0b0b; --f2:#fff; --f3:#fff; --f4:#fff; --f5:#fff;
 }
@@ -19,7 +19,7 @@
     color-scheme:dark;
     --bg:#1a1a19; --plane:#242423; --ink:#f0efec; --sub:#c3c2b7; --muted:#898781;
     --grid:#2c2c2a; --axis:#383835; --border:rgba(255,255,255,.10);
-    --s1:#3987e5; --s2:#d95926; --ok:#0ca30c; --ng:#e66767;
+    --s1:#3987e5; --s2:#d95926; --s3:#199e70; --ok:#0ca30c; --ng:#e66767;
     --b0:#0d366b; --b1:#184f95; --b2:#256abf; --b3:#3987e5; --b4:#6da7ec; --b5:#b7d3f6;
     --f0:#f0efec; --f1:#f0efec; --f2:#fff; --f3:#fff; --f4:#0b0b0b; --f5:#0b0b0b;
   }
@@ -28,7 +28,7 @@
   color-scheme:dark;
   --bg:#1a1a19; --plane:#242423; --ink:#f0efec; --sub:#c3c2b7; --muted:#898781;
   --grid:#2c2c2a; --axis:#383835; --border:rgba(255,255,255,.10);
-  --s1:#3987e5; --s2:#d95926; --ok:#0ca30c; --ng:#e66767;
+  --s1:#3987e5; --s2:#d95926; --s3:#199e70; --ok:#0ca30c; --ng:#e66767;
   --b0:#0d366b; --b1:#184f95; --b2:#256abf; --b3:#3987e5; --b4:#6da7ec; --b5:#b7d3f6;
   --f0:#f0efec; --f1:#f0efec; --f2:#fff; --f3:#fff; --f4:#0b0b0b; --f5:#0b0b0b;
 }
@@ -180,10 +180,11 @@ footer{max-width:960px;margin:0 auto;padding:0 16px 48px;font-size:12px;color:va
 
   <section aria-labelledby="h-curve">
     <h2 id="h-curve">時間帯ごとの変化</h2>
-    <p class="note">平日と土日祝の平均に、選んだ日の実測値を重ねて表示します。</p>
+    <p class="note">平日（火〜木）・金曜・土日祝それぞれの平均に、選んだ日の実測値を重ねて表示します。金曜は 20:00 まで開室しているので分けています。</p>
     <div class="bar">
-      <span class="key"><i style="background:var(--s1)"></i>平日平均</span>
-      <span class="key"><i style="background:var(--s2)"></i>土日祝平均</span>
+      <span class="key"><i style="background:var(--s1)"></i>平日（火〜木）</span>
+      <span class="key"><i style="background:var(--s3)"></i>金曜</span>
+      <span class="key"><i style="background:var(--s2)"></i>土日祝</span>
       <span class="key"><i class="dot" style="background:var(--ink)"></i><span id="selKey">選んだ日</span></span>
       <select id="day" aria-label="重ねて表示する日"></select>
     </div>
