@@ -3,8 +3,13 @@ name: fetch
 on:
   schedule:
     # GitHub の定期実行は毎時0分付近が混み合い、遅延・スキップされやすいので半端な分にする
-    - cron: '17 12 * * *' # JST 21:17 本番
-    - cron: '47 14 * * *' # JST 23:47 予備（本番が動かなかった場合の保険。since_id 以降のみ取得するので重複・追加課金なし）
+    # timezone 指定なしだと UTC。ここでは JST で書く
+    - cron: '17 21 * * *' # 21:17 本番
+      timezone: 'Asia/Tokyo'
+    - cron: '47 23 * * *' # 23:47 予備（本番が動かなかった場合の保険。since_id 以降のみ取得するので重複・追加課金なし）
+      timezone: 'Asia/Tokyo'
+    - cron: '50 22 24 11 *' # 動作確認用（2026-11-24 22:50 のみ）。確認後に削除
+      timezone: 'Asia/Tokyo'
   workflow_dispatch:
     inputs:
       start_time:
