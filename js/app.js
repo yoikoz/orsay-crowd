@@ -372,7 +372,7 @@ function setStatus() {
   const nLocal = Object.keys(local).length;
   const last = meta.last_run ? new Date(meta.last_run) : null;
   const fmt = last ? last.toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : null;
-  $('status').textContent = (fmt ? `最終取得 ${fmt}` : '自動取得はまだ実行されていません') + (nLocal ? `・この端末の追加 ${nLocal}件` : '');
+  $('status').textContent = (fmt ? `最終取得 ${fmt}` : 'まだ取得していません') + (nLocal ? `・この端末の追加 ${nLocal}件` : '');
 }
 
 function render() {
@@ -380,18 +380,88 @@ function render() {
   drawNow(list); drawBest(list); drawHeat(list); fillDays(list); drawCurve(); drawCal(); drawRows(list); setStatus();
 }
 
+async function loadData() {
+  try {
+    const bust = '?t=' + Date.now(); // 取得直後の更新を CDN のキャッシュに邪魔されないように
+    [server, meta] = await Promise.all([getJSON('data/posts.json' + bust), getJSON('data/state.json' + bust).catch(() => ({}))]);
+    // サーバーに取り込まれた端末分は消す
+    const ids = new Set(server.map(p => p.id));
+    let pruned = false;
+    for (const id of Object.keys(local)) if (ids.has(id)) { delete local[id]; pruned = true; }
+    if (pruned) saveLocal();
+    render();
+  } catch (e) {
+    $('status').textContent = location.protocol === 'file:'
+      ? 'ファイルを直接開くとデータを読み込めません。python3 -m http.server で開いてください'
+      : 'データを読み込めませんでした（' + e.message + '）';
+  }
+}
+
+/* ---------- 「最新を取得」ボタン（Cloudflare Worker 経由で fetch を起動。1時間に1回まで） ---------- */
+// worker/ をデプロイしたら、その URL をここに書く（空ならボタンを出さない）
+const REFRESH_API = '';
+
+const hm = iso => new Date(iso).toLocaleTimeString('ja-JP', { timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit' });
+let pollTimer = null;
+
+function showRefresh(s) {
+  const b = $('refresh');
+  b.hidden = false;
+  if (s.running) { b.disabled = true; b.textContent = '取得中…'; return; }
+  b.disabled = !s.available;
+  b.textContent = s.available ? '最新を取得' : `次は ${hm(s.next_available_at)} から`;
+}
+
+async function refreshStatus() {
+  const r = await fetch(REFRESH_API + '/status', { cache: 'no-store' });
+  if (!r.ok) throw new Error(r.status);
+  const s = await r.json();
+  showRefresh(s);
+  return s;
+}
+
+// 実行が終わるまで20秒ごとに確認し、終わったらデータを読み込み直す（最長10分）
+function pollUntilDone(startedAt) {
+  clearInterval(pollTimer);
+  const until = Date.now() + 10 * 60e3;
+  pollTimer = setInterval(async () => {
+    try {
+      const s = await refreshStatus();
+      // 時計のずれを見込んで60秒の余裕を持たせる（前回の実行は60分以上前なので取り違えない）
+      const done = s.last_run && s.last_run.status === 'completed' && Date.parse(s.last_run.created_at) >= Date.parse(startedAt) - 60e3;
+      if (done) {
+        clearInterval(pollTimer);
+        await loadData();
+        $('refreshMsg').textContent = s.last_run.conclusion === 'success' ? '最新の情報に更新しました' : '取得に失敗しました。時間をおいてお試しください';
+      }
+    } catch {}
+    if (Date.now() > until) { clearInterval(pollTimer); $('refreshMsg').textContent = '時間がかかっています。しばらくしてから再読み込みしてください'; }
+  }, 20e3);
+}
+
+$('refresh').addEventListener('click', async () => {
+  const b = $('refresh');
+  b.disabled = true; b.textContent = '取得中…';
+  $('refreshMsg').textContent = '';
+  try {
+    const r = await fetch(REFRESH_API + '/refresh', { method: 'POST' });
+    const s = await r.json();
+    if (r.status === 202) {
+      $('refreshMsg').textContent = '取得を始めました。2〜3分で反映されます';
+      pollUntilDone(s.started_at);
+    } else if (r.status === 429) {
+      showRefresh({ ...s, available: false });
+      $('refreshMsg').textContent = s.reason === 'running' ? 'いま取得中です' : `直近1時間以内に取得済みです。次は ${hm(s.next_available_at)} から押せます`;
+    } else {
+      throw new Error(s.error || r.status);
+    }
+  } catch (e) {
+    b.disabled = false; b.textContent = '最新を取得';
+    $('refreshMsg').textContent = '取得を開始できませんでした。時間をおいてお試しください';
+  }
+});
+
 loadLocal();
 render();
-try {
-  [server, meta] = await Promise.all([getJSON('data/posts.json'), getJSON('data/state.json').catch(() => ({}))]);
-  // サーバーに取り込まれた端末分は消す
-  const ids = new Set(server.map(p => p.id));
-  let pruned = false;
-  for (const id of Object.keys(local)) if (ids.has(id)) { delete local[id]; pruned = true; }
-  if (pruned) saveLocal();
-  render();
-} catch (e) {
-  $('status').textContent = location.protocol === 'file:'
-    ? 'ファイルを直接開くとデータを読み込めません。python3 -m http.server で開いてください'
-    : 'データを読み込めませんでした（' + e.message + '）';
-}
+await loadData();
+if (REFRESH_API) refreshStatus().then(s => { if (s.running) pollUntilDone(s.last_run.created_at); }).catch(() => {});

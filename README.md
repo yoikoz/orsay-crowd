@@ -1,6 +1,6 @@
 # オルセー展 混雑ログ
 
-東京都美術館で開催中の「オルセー美術館所蔵 いまを生きる歓び展」の入場待ち時間を毎日記録し、**空いている曜日と時間帯**を調べられるようにしたサイトです。
+東京都美術館で開催中の「オルセー美術館所蔵 いまを生きる歓び展」の入場待ち時間を記録し、**空いている曜日と時間帯**を調べられるようにしたサイトです。
 
 **サイト：https://yoikoz.github.io/orsay-crowd/**
 
@@ -17,7 +17,7 @@
 
 公式アカウント [@orsay_annai](https://x.com/orsay_annai) が投稿する「会場混雑状況」ポストがもとになっています。
 
-- 毎日 21時ごろ（閉館後）に、X API でその日の新しいポストを取得します
+- サイトの「最新を取得」ボタンが押されると、X API で前回以降の新しいポストを取得します（1時間に1回まで）
 - 混雑状況のポストから、**日時と待ち時間の数値だけ**を取り出して保存します。ポストの本文は保存しません
 - 混雑状況以外のポストは、取得したあとすぐに捨てます
 - 自動取得で漏れたポストは、手動で補完することがあります
@@ -46,13 +46,19 @@
 
 ## しくみ
 
-GitHub Actions と GitHub Pages だけで動いています。サーバーとデータベースは使っていません。
+GitHub Actions と GitHub Pages、ボタンの中継用の小さな Cloudflare Worker だけで動いています。サーバーとデータベースは使っていません。
 
 ```
-毎日 21:00 JST  GitHub Actions ─ X API でポスト取得 ─ 解析 ─ data/posts.json にコミット
-                                                                  │
-                                    GitHub Pages ← サイトを更新 ──┘
+「最新を取得」ボタン → Cloudflare Worker（直近1時間に実行済みなら断る）
+                         │ GitHub API でワークフローを起動
+                         ▼
+                   GitHub Actions ─ X API でポスト取得 ─ 解析 ─ data/posts.json にコミット
+                                                                    │
+                                      GitHub Pages ← サイトを更新 ──┘
 ```
+
+GitHub Actions の定期実行（schedule）は時刻どおりに起動しないことが続いたため、使っていません。
+前回取得したポスト以降の分だけを取るので、しばらく誰も押さなくても、次に押されたときにまとめて取り込まれます。
 
 | ファイル | 役割 |
 |---|---|
@@ -61,7 +67,8 @@ GitHub Actions と GitHub Pages だけで動いています。サーバーとデ
 | `scripts/fetch.mjs` | X API から取得して `data/posts.json` に追記 |
 | `scripts/add-manual.mjs` | 手動での追加・削除 |
 | `scripts/lookup-user.mjs` | アカウントの user id を調べる（初回のみ） |
-| `.github/workflows/` | 定期取得（`fetch`）、手動追加（`manual-add`）、公開（`pages`）、id の確認（`lookup-user`） |
+| `worker/index.js` | 「最新を取得」ボタンから `fetch` を起動する Cloudflare Worker（1時間に1回まで） |
+| `.github/workflows/` | 取得（`fetch`）、手動追加（`manual-add`）、公開（`pages`）、id の確認（`lookup-user`） |
 
 ## 自分で動かす
 
@@ -79,7 +86,13 @@ GitHub Actions と GitHub Pages だけで動いています。サーバーとデ
    ```
 5. Actions → `fetch` を実行する。`start_time` に日時（例：`2026-11-01T00:00:00+09:00`）を入れると、その時点以降をまとめて取得できる
 
-以降は毎日 JST 21:00 に自動で取得します。実行ログに取得件数と推定コストが出ます。
+6. 「最新を取得」ボタンを使う場合は、Cloudflare Worker を用意する
+   - GitHub で fine-grained personal access token を発行する（対象リポジトリは fork したものだけ、権限は Actions: Read and write だけ、有効期限は会期終了後）
+   - Cloudflare の管理画面で Worker を作り、`worker/index.js` を貼り付けて、先頭の `CONFIG`（リポジトリ名・サイトの URL）を書き換える
+   - Worker の Settings → Variables and Secrets に、Secret `GH_TOKEN` としてトークンを登録する
+   - `js/app.js` の `REFRESH_API` に Worker の URL を書く
+
+X API の課金は「返ってきたポストの件数」に対してなので、ボタンを何回押しても、新しいポストがなければ費用はかかりません。実行ログに取得件数と推定コストが出ます。
 
 ### ローカルで確認
 

@@ -149,12 +149,23 @@ footer{max-width:960px;margin:0 auto;padding:0 16px 48px;font-size:12px;color:va
   section{padding:28px 0}
 }
 @media (prefers-reduced-motion:reduce){#tip{transition:none}}
+.hdr{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+#refresh{height:32px;padding:0 12px;font-size:13px}
+#refresh:disabled{cursor:default;opacity:.55}
+#refresh:disabled:hover{background:var(--bg)}
+.refresh-msg{flex-basis:100%;margin:4px 0 0;text-align:right}
+.refresh-msg:empty{display:none}
+@media (max-width:640px){.refresh-msg{text-align:left}}
 </style>
 </head>
 <body>
 <header>
   <h1>オルセー美術館展 混雑ログ</h1>
-  <span class="sub" id="status">読み込み中…</span>
+  <div class="hdr">
+    <span class="sub" id="status">読み込み中…</span>
+    <button type="button" id="refresh" hidden>最新を取得</button>
+  </div>
+  <p class="sub refresh-msg" id="refreshMsg" aria-live="polite"></p>
 </header>
 
 <main>
@@ -236,7 +247,7 @@ footer{max-width:960px;margin:0 auto;padding:0 16px 48px;font-size:12px;color:va
 </main>
 
 <footer>
-  データの出典：<a href="https://x.com/orsay_annai" target="_blank" rel="noopener">@orsay_annai</a> の会場混雑状況ポスト（毎日 21時ごろ自動取得）。非公式の記録です。
+  データの出典：<a href="https://x.com/orsay_annai" target="_blank" rel="noopener">@orsay_annai</a> の会場混雑状況ポスト（上の「最新を取得」ボタンで、1時間に1回まで取得できます）。非公式の記録です。
 </footer>
 
 <div id="tip" role="tooltip"></div>

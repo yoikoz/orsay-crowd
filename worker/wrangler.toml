@@ -1,0 +1,6 @@
+# CLI（wrangler）でデプロイする場合の設定。管理画面に index.js を貼り付ける場合は不要
+#   npx wrangler deploy
+#   npx wrangler secret put GH_TOKEN
+name = "orsay-refresh"
+main = "index.js"
+compatibility_date = "2026-11-01"
