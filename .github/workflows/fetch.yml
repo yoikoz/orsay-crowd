@@ -1,7 +1,7 @@
 name: fetch
 
 # 定期実行（schedule）は時刻どおりに起動しなかったため使わない。
-# サイトの「最新を取得」ボタン（worker/ の Cloudflare Worker 経由、1時間に1回まで）か、Actions 画面から手動で実行する
+# Actions 画面の Run workflow（または gh workflow run fetch）で手動実行する
 on:
   workflow_dispatch:
     inputs:
