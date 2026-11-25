@@ -11,6 +11,7 @@ on:
 
 permissions:
   contents: read
+  actions: read   # deploy-pages が成果物の一覧を取得するため
   pages: write
   id-token: write
 
@@ -18,12 +19,11 @@ concurrency:
   group: pages
   cancel-in-progress: true
 
+# アップロードと公開を別ジョブに分ける。同じジョブ内で続けて実行すると、
+# アップロード直後の成果物を deploy-pages が見つけられず失敗することがあった
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -32,5 +32,13 @@ jobs:
       - uses: actions/upload-pages-artifact@v5
         with:
           path: .
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
       - id: deployment
         uses: actions/deploy-pages@v5
