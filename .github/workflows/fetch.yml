@@ -1,15 +1,8 @@
 name: fetch
 
+# 定期実行（schedule）は時刻どおりに起動しなかったため使わない。
+# サイトの「最新を取得」ボタン（worker/ の Cloudflare Worker 経由、1時間に1回まで）か、Actions 画面から手動で実行する
 on:
-  schedule:
-    # GitHub の定期実行は毎時0分付近が混み合い、遅延・スキップされやすいので半端な分にする
-    # timezone 指定なしだと UTC。ここでは JST で書く
-    - cron: '17 21 * * *' # 21:17 本番
-      timezone: 'Asia/Tokyo'
-    - cron: '47 23 * * *' # 23:47 予備（本番が動かなかった場合の保険。since_id 以降のみ取得するので重複・追加課金なし）
-      timezone: 'Asia/Tokyo'
-    - cron: '50 22 24 11 *' # 動作確認用（2026-11-24 22:50 のみ）。確認後に削除
-      timezone: 'Asia/Tokyo'
   workflow_dispatch:
     inputs:
       start_time:
@@ -34,8 +27,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
       - name: Test parser
@@ -52,7 +45,6 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add data/
-          # state.json の last_run が毎回変わるので、ポストがない日もコミットされる（60日無操作で cron が止まるのを防ぐ）
           git diff --cached --quiet || git commit -m "data: fetch $(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M')"
           git pull --rebase
           git push
