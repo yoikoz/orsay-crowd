@@ -1,19 +1,10 @@
 name: fetch
 
 # 定期実行（schedule）は時刻どおりに起動しなかったため使わない。
-# Actions 画面の Run workflow（または gh workflow run fetch）で手動実行する
+# Actions 画面の Run workflow（または gh workflow run fetch）で手動実行する。
+# 入力なしで、前回取得したポスト（data/state.json の since_id）以降の差分だけを取る
 on:
   workflow_dispatch:
-    inputs:
-      start_time:
-        description: 'since_id が未保存のときの取得開始（例: 2026-11-01T00:00:00+09:00）。空なら当日0時(JST)'
-        required: false
-        default: ''
-      backfill:
-        description: '過去分を取り込む（since_id を無視。start_time が空なら API で遡れる最大 3200件まで）'
-        type: boolean
-        required: false
-        default: false
 
 permissions:
   contents: write
@@ -37,8 +28,6 @@ jobs:
         env:
           X_BEARER_TOKEN: ${{ secrets.X_BEARER_TOKEN }}
           X_USER_ID: ${{ vars.X_USER_ID }}
-          START_TIME: ${{ inputs.start_time }}
-          BACKFILL: ${{ inputs.backfill }}
         run: node scripts/fetch.mjs
       - name: Commit data
         run: |

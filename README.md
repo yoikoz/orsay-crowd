@@ -81,7 +81,8 @@ GitHub Actions の定期実行（schedule）は時刻どおりに起動しない
    ```sh
    gh variable set X_USER_ID --body <id>
    ```
-5. Actions → `fetch` を実行する。`start_time` に日時（例：`2026-11-01T00:00:00+09:00`）を入れると、その時点以降をまとめて取得できる
+5. Actions → `fetch` → Run workflow を実行する。初回は当日0時（JST）以降、2回目からは前回以降の差分を取得する
+   - 過去分をまとめて取り込みたい場合は、ローカルで `BACKFILL=true node scripts/fetch.mjs` を実行してから `data/` をコミットする（環境変数 `X_BEARER_TOKEN` と `X_USER_ID` が必要。`START_TIME` で開始日時も指定できる）
 
 以降は、更新したいときに Actions → `fetch` → Run workflow を実行します（`gh workflow run fetch` でも可）。
 X API の課金は「返ってきたポストの件数」に対してなので、何回実行しても、新しいポストがなければ費用はかかりません。実行ログに取得件数と推定コストが出ます。
